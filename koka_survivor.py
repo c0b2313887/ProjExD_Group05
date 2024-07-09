@@ -73,7 +73,12 @@ class Bird(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = xy
         self.speed = 6
-        
+
+        # レベルと経験値の初期化
+        self.level = 1
+        self.experience = 0
+        self.exp_to_next_level = 50
+        self.font = pg.font.Font(None, 50)
 
     def change_img(self, num: int, screen: pg.Surface):
         """
@@ -95,18 +100,59 @@ class Bird(pg.sprite.Sprite):
         """
         x_diff, y_diff = mouse_pos[0] - self.rect.centerx, mouse_pos[1] - self.rect.centery
         norm = math.sqrt(x_diff**2 + y_diff**2)
-        #if norm != 0:
-        #    # マウスの方向ベクトルに速度5を乗じて移動させる
-        #    self.rect.move_ip(5 * x_diff / norm, 5 * y_diff / norm)
-        #if check_bound(self.rect) != (True, True):
-        #    self.rect.move_ip(-5 * x_diff / norm, -5 * y_diff / norm)
-        #if x_diff != 0 or y_diff != 0:
-        #    self.dire = (x_diff / norm, y_diff / norm)
-        #    angle = math.degrees(math.atan2(-self.dire[1], self.dire[0]))
-        #    self.image = pg.transform.rotozoom(self.imgs[(+1, 0)], angle, 1.0)
-        #elif 0 <=x_diff < 5 or 0 <= y_diff < 5:
-        #
-        #screen.blit(self.image, self.rect)
+         
+        
+    def gain_experience(self, amount: int):
+        """
+        経験値を取得し、レベルアップをチェックする
+        引数 amount: 獲得する経験値の量
+        """
+        self.experience += amount
+        if self.experience >= self.exp_to_next_level:
+            self.level_up()
+
+    def level_up(self):
+        """
+        レベルアップ処理
+        """
+        self.level += 1
+        self.experience = 0  # 経験値をリセット
+        if self.level == 2:
+            self.exp_to_next_level = 100  # レベル3になるための経験値を100に設定
+        elif self.level == 3:
+            self.exp_to_next_level = 100  # 次のレベルまでの経験値を150に設定
+        self.speed += 1  # レベルアップ時に速度を上げるなどの強化
+
+    def display_level(self, screen: pg.Surface):
+        """
+        レベルを画面に表示する
+        引数 screen: 画面Surface
+        """
+        level_surf = self.font.render(f"Level: {self.level}", True, (0, 255, 0))
+        screen.blit(level_surf, (50, 50))
+
+    def display_experience_bar(self, screen: pg.Surface):
+        """
+        経験値ゲージを画面に表示する
+        引数 screen: 画面Surface
+        """
+        bar_width = 400
+        bar_height = 20
+        filled_bar_width = int(bar_width * self.experience / self.exp_to_next_level)
+        
+        # 背景のバー
+        pg.draw.rect(screen, (128, 128, 128), (50, 100, bar_width, bar_height)) # グレー
+        # 埋まっている部分
+        pg.draw.rect(screen, (0, 255, 0), (50, 100, filled_bar_width, bar_height)) # 緑
+
+    def update(self, mouse_pos: tuple[int, int], screen: pg.Surface):
+        """
+        マウスの方向に応じてこうかとんを移動させる
+        引数1 mouse_pos：マウスの現在位置座標タプル
+        引数2 screen：画面Surface
+        """
+        x_diff, y_diff = mouse_pos[0] - self.rect.centerx, mouse_pos[1] - self.rect.centery
+        norm = math.sqrt(x_diff**2 + y_diff**2)
         if norm <= self.speed:
             self.rect.centerx = mouse_pos[0]
             self.rect.centery = mouse_pos[1]
@@ -122,6 +168,11 @@ class Bird(pg.sprite.Sprite):
             self.image = pg.transform.rotozoom(self.imgs[(+1, 0)], angle, 1.0)
         
         screen.blit(self.image, self.rect)
+        self.display_level(screen)
+        self.display_experience_bar(screen)
+
+
+
 
 
 
@@ -318,12 +369,12 @@ def main():
     clock = pg.time.Clock()
     while True:
         key_lst = pg.key.get_pressed()
-        if tmr%100 == 0:
-                if emys:  # 敵が存在する場合
-                    # 最も近い敵を選択
-                    nearest_enemy = min(emys, key=lambda emy: math.hypot(bird.rect.centerx - emy.rect.centerx, bird.rect.centery - emy.rect.centery))
-                    # 最も近い敵の方向にビームを発射
-                    beams.add(Beam(bird, nearest_enemy.rect))
+        if tmr % 100 == 0:
+            if emys:  # 敵が存在する場合
+                # 最も近い敵を選択
+                nearest_enemy = min(emys, key=lambda emy: math.hypot(bird.rect.centerx - emy.rect.centerx, bird.rect.centery - emy.rect.centery))
+                # 最も近い敵の方向にビームを発射
+                beams.add(Beam(bird, nearest_enemy.rect))
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
@@ -332,14 +383,15 @@ def main():
             if event.type == pg.QUIT:
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird, emy))
+                if emys:
+                    nearest_enemy = min(emys, key=lambda emy: math.hypot(bird.rect.centerx - emy.rect.centerx, bird.rect.centery - emy.rect.centery))
+                    beams.add(Beam(bird, nearest_enemy.rect))
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
                 if score.value >= 200:
                     gravities.add(Gravity(400))
                     score.value -= 200
     
         screen.blit(scaled_bg_img, [0, 0])
-
 
         if tmr % 200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
@@ -353,10 +405,12 @@ def main():
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
             score.value += 10  # 10点アップ
             bird.change_img(6, screen)  # こうかとん喜びエフェクト
+            bird.gain_experience(10)  # 経験値を獲得
 
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
+            bird.gain_experience(5)  # 経験値を獲得
 
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
             bird.change_img(8, screen)  # こうかとん悲しみエフェクト
@@ -376,10 +430,12 @@ def main():
             for bomb in pg.sprite.spritecollide(gravity, bombs, True):
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
+                bird.gain_experience(5)  # 経験値を獲得
 
             for bomb in pg.sprite.spritecollide(gravity, emys, True):
                 exps.add(Explosion(bomb, 50))
                 score.value += 10
+                bird.gain_experience(10)  # 経験値を獲得
 
         bird.update(mouse_pos, screen)
         beams.update()
