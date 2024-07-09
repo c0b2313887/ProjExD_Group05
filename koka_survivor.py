@@ -181,40 +181,70 @@ class NeoBeam(pg.sprite.Sprite):
 
     def gen_beams(self):
         """
-        指定された数のビームを生成し、リストで返す
+        指定された数のビームを発射する
         """
         beams = []
-        step = 100 / (self.num - 1) #ステップの計算
-        angles = [-50 + step * i for i in range(self.num)] #角度をリストに入れる
-        for angle in angles:
-            beams.append(Beam(self.bird, angle)) #リストにappend
-        return beams #リストを戻り値に設定
-    
+        for angle in range(0, 360, int(360/self.num)):
+            beams.append(Beam(self.bird, angle))
+        return beams
+
 
 class Explosion(pg.sprite.Sprite):
     """
     爆発に関するクラス
     """
-    def __init__(self, obj: "Bomb|Enemy", life: int):
+    def __init__(self, obj: pg.sprite.Sprite, life: int):
         """
-        爆弾が爆発するエフェクトを生成する
-        引数1 obj：爆発するBombまたは敵機インスタンス
-        引数2 life：爆発時間
+        爆発Surfaceを生成する
+        引数1 obj：爆発する対象
+        引数2 life：爆発の寿命
         """
         super().__init__()
         img = pg.image.load(f"fig/explosion.gif")
-        self.imgs = [img, pg.transform.flip(img, 1, 1)]
-        self.image = self.imgs[0]
-        self.rect = self.image.get_rect(center=obj.rect.center)
+        self.image = pg.transform.rotozoom(img, 0, 2.0)
+        self.rect = self.image.get_rect()
+        self.rect.center = obj.rect.center
         self.life = life
 
     def update(self):
         """
-        爆発時間を1減算した爆発経過時間_lifeに応じて爆発画像を切り替えることで
-        爆発エフェクトを表現する
+        爆発の寿命を減じ，寿命が尽きたら爆発を消去する
         """
         self.life -= 1
-        self.image = self.imgs[self.life//10%2]
+        if self.life < 0:
+            self.kill()
+
+
+class Score:
+    """
+    スコアに関するクラス
+    """
+    def __init__(self):
+        self.font = pg.font.Font(None, 60)
+        self.value = 0
+
+    def update(self, screen: pg.Surface):
+        """
+        スコアを更新する
+        引数 screen：画面Surface
+        """
+        score_surf = self.font.render(f"Score: {self.value}", True, (0, 0, 0))
+        screen.blit(score_surf, (10, 10))
+
+class Gravity(pg.sprite.Sprite):
+    """
+    重力の影響を与える範囲を表現するクラス
+    """
+    def __init__(self, size):
+        super().__init__()
+        self.image = pg.Surface((2*size, 2*size), pg.SRCALPHA)
+        pg.draw.circle(self.image, (0, 0, 0, 50), (size, size), size)
+        self.rect = self.image.get_rect()
+        self.rect.center = (WIDTH//2, HEIGHT//2)
+        self.life = 500  # 存在するフレーム数
+
+    def update(self):
+        self.life -= 1
         if self.life < 0:
             self.kill()
 
@@ -229,63 +259,27 @@ class Enemy(pg.sprite.Sprite):
         super().__init__()
         self.image = random.choice(__class__.imgs)
         self.rect = self.image.get_rect()
-        self.rect.center = random.randint(0, WIDTH), 0
-        self.vx, self.vy = 0, +6
-        self.bound = random.randint(50, HEIGHT//2)  # 停止位置
-        self.state = "down"  # 降下状態or停止状態
-        self.interval = random.randint(50, 300)  # 爆弾投下インターバル
+        # 画面の外側のランダムな位置に初期化
+        self.rect.center = random.choice([(random.randint(0, WIDTH), -50), 
+                                          (random.randint(0, WIDTH), HEIGHT + 50), 
+                                          (-50, random.randint(0, HEIGHT)), 
+                                          (WIDTH + 50, random.randint(0, HEIGHT))])
+        self.speed = 6  # 移動速度
 
-    def update(self):
+    def update(self, target_pos):
         """
-        敵機を速度ベクトルself.vyに基づき移動（降下）させる
-        ランダムに決めた停止位置_boundまで降下したら，_stateを停止状態に変更する
-        引数 screen：画面Surface
+        敵機をマウスポインターに向かって移動させる
+        引数 target_pos：マウスポインターの位置
         """
-        if self.rect.centery > self.bound:
-            self.vy = 0
-            self.state = "stop"
-        self.rect.move_ip(self.vx, self.vy)
-
-
-class Score:
-    """
-    打ち落とした爆弾，敵機の数をスコアとして表示するクラス
-    爆弾：1点
-    敵機：10点
-    """
-    def __init__(self):
-        self.font = pg.font.Font(None, 50)
-        self.color = (0, 0, 255)
-        self.value = 0
-        self.image = self.font.render(f"Score: {self.value}", 0, self.color)
-        self.rect = self.image.get_rect()
-        self.rect.center = 100, HEIGHT-50
-
-    def update(self, screen: pg.Surface):
-        self.image = self.font.render(f"Score: {self.value}", 0, self.color)
-        screen.blit(self.image, self.rect)
-
-class Gravity(pg.sprite.Sprite):
-    def __init__(self, life:int):
-        super().__init__()
-        self.image = pg.Surface((WIDTH, HEIGHT))
-        pg.draw.rect(self.image, (0, 0, 0), (0, 0, WIDTH, HEIGHT))
-        self.rect = self.image.get_rect()
-        self.life = life
-        self.image.set_alpha(120)
-        
-    
-    def update(self):
-        self.life -= 1
-        if self.life < 0:
-            self.kill()
+        direction = calc_orientation(self.rect, pg.Rect(target_pos, (1, 1)))
+        self.rect.move_ip(self.speed * direction[0], self.speed * direction[1])
 
 
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/aozora.jpg")
-    scaled_bg_img = pygame.transform.scale(bg_img,(int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
+    scaled_bg_img = pygame.transform.scale(bg_img, (int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
     score = Score()
 
     bird = Bird(3, (900, 400))
@@ -309,20 +303,21 @@ def main():
                     gravities.add(Gravity(400))
                     score.value -= 200
             if event.type == pg.KEYDOWN:
-                if event.key == pg.K_SPACE and key_lst[pg.K_LSHIFT]: #シフト押下状態でスペースを押すと
-                    neobeam = NeoBeam(bird, 5) #ビームを複数発射
+                if event.key == pg.K_SPACE and key_lst[pg.K_LSHIFT]:  # シフト押下状態でスペースを押すと
+                    neobeam = NeoBeam(bird, 5)  # ビームを複数発射
                     beams.add(neobeam.gen_beams())
                 elif event.key == pg.K_SPACE:
                     beams.add(Beam(bird))
-    
+
         screen.blit(scaled_bg_img, [0, 0])
 
-        if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
+        if tmr % 200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
 
+        mouse_pos = pg.mouse.get_pos()
+        
         for emy in emys:
-            if emy.state == "stop" and tmr%emy.interval == 0:
-                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
+            if tmr % 100 == 0:  # 一定間隔で爆弾を投下
                 bombs.add(Bomb(emy, bird))
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():
@@ -335,26 +330,32 @@ def main():
             score.value += 1  # 1点アップ
 
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
-            bird.change_img(8, screen) # こうかとん悲しみエフェクト
+            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
             score.update(screen)
             pg.display.update()
             time.sleep(2)
             return
-        
+
+        if len(pg.sprite.spritecollide(bird, emys, True)) != 0:
+            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
+            score.update(screen)
+            pg.display.update()
+            time.sleep(2)
+            return
+
         for gravity in gravities:
             for bomb in pg.sprite.spritecollide(gravity, bombs, True):
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
-            
+
             for bomb in pg.sprite.spritecollide(gravity, emys, True):
                 exps.add(Explosion(bomb, 50))
                 score.value += 10
-        
-        
+
         bird.update(key_lst, screen)
         beams.update()
         beams.draw(screen)
-        emys.update()
+        emys.update(mouse_pos)  # 更新メソッドにマウスポインターの位置を渡す
         emys.draw(screen)
         bombs.update()
         bombs.draw(screen)
