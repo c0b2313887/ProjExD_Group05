@@ -4,6 +4,7 @@ import random
 import sys
 import time
 import pygame as pg
+import pygame
 
 
 WIDTH = 1100  # ゲームウィンドウの幅
@@ -55,7 +56,7 @@ class Bird(pg.sprite.Sprite):
         引数2 xy：こうかとん画像の位置座標タプル
         """
         super().__init__()
-        img0 = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 2.0)
+        img0 = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 1.0)
         img = pg.transform.flip(img0, True, False)  # デフォルトのこうかとん
         self.imgs = {
             (+1, 0): img,  # 右
@@ -80,7 +81,7 @@ class Bird(pg.sprite.Sprite):
         引数1 num：こうかとん画像ファイル名の番号
         引数2 screen：画面Surface
         """
-        self.image = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 2.0)
+        self.image = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 1.0)
         screen.blit(self.image, self.rect)
 
     def update(self, key_lst: list[bool], screen: pg.Surface):
@@ -163,6 +164,15 @@ class Beam(pg.sprite.Sprite):
 
     def update(self):
         """
+        爆弾を速度ベクトルself.vx, self.vyに基づき移動させる
+        引数 screen：画面Surface
+        """
+        self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
+        if check_bound(self.rect) != (True, True):
+            self.kill()
+
+    def update(self):
+        """
         ビームを速度ベクトルself.vx, self.vyに基づき移動させる
         引数 screen：画面Surface
         """
@@ -194,6 +204,7 @@ class Explosion(pg.sprite.Sprite):
     """
     爆発に関するクラス
     """
+    
     def __init__(self, obj: "Bomb|Enemy", life: int):
         """
         爆弾が爆発するエフェクトを生成する
@@ -283,7 +294,8 @@ class Gravity(pg.sprite.Sprite):
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
-    bg_img = pg.image.load(f"fig/pg_bg.jpg")
+    bg_img = pg.image.load(f"fig/aozora.jpg")
+    scaled_bg_img = pygame.transform.scale(bg_img,(int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
     score = Score()
 
     bird = Bird(3, (900, 400))
@@ -300,8 +312,6 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
-            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird))
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
                 if score.value >= 200:
                     gravities.add(Gravity(400))
@@ -311,16 +321,18 @@ def main():
                     neobeam = NeoBeam(bird, 5) #ビームを複数発射
                     beams.add(neobeam.gen_beams())
                 elif event.key == pg.K_SPACE:
-                    beams.add(Beam(bird))
+                    screen.blit(scaled_bg_img, [0, 0])
     
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
+        if tmr%50 == 0: 
+            beams.add(Beam(bird))
 
         for emy in emys:
             if emy.state == "stop" and tmr%emy.interval == 0:
-                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
+                  # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
                 bombs.add(Bomb(emy, bird))
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():
@@ -333,6 +345,13 @@ def main():
             score.value += 1  # 1点アップ
 
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
+            bird.change_img(8, screen) # こうかとん悲しみエフェクト
+            score.update(screen)
+            pg.display.update()
+            time.sleep(2)
+            return
+        
+        if len(pg.sprite.spritecollide(bird, emys, True)) != 0:
             bird.change_img(8, screen) # こうかとん悲しみエフェクト
             score.update(screen)
             pg.display.update()
