@@ -84,27 +84,45 @@ class Bird(pg.sprite.Sprite):
         self.image = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 1.0)
         screen.blit(self.image, self.rect)
 
-    def update(self, key_lst: list[bool], screen: pg.Surface):
+
+    
+    # マウスの方向にスピード5で進むようにする
+    def update(self, mouse_pos: tuple[int, int], screen: pg.Surface):
         """
-        押下キーに応じてこうかとんを移動させる
-        引数1 key_lst：押下キーの真理値リスト
+        マウスの方向に応じてこうかとんを移動させる
+        引数1 mouse_pos：マウスの現在位置座標タプル
         引数2 screen：画面Surface
         """
-        sum_mv = [0, 0]
-        current_speed = self.speed #current_speedにデフォルトのスピードを入れる
-        if key_lst[pg.K_LSHIFT]: #シフト押したらスピード20にする
-            current_speed = 20
-        for k, mv in __class__.delta.items():
-            if key_lst[k]:
-                sum_mv[0] += mv[0]
-                sum_mv[1] += mv[1]
-        self.rect.move_ip(current_speed*sum_mv[0], current_speed*sum_mv[1])
+        x_diff, y_diff = mouse_pos[0] - self.rect.centerx, mouse_pos[1] - self.rect.centery
+        norm = math.sqrt(x_diff**2 + y_diff**2)
+        #if norm != 0:
+        #    # マウスの方向ベクトルに速度5を乗じて移動させる
+        #    self.rect.move_ip(5 * x_diff / norm, 5 * y_diff / norm)
+        #if check_bound(self.rect) != (True, True):
+        #    self.rect.move_ip(-5 * x_diff / norm, -5 * y_diff / norm)
+        #if x_diff != 0 or y_diff != 0:
+        #    self.dire = (x_diff / norm, y_diff / norm)
+        #    angle = math.degrees(math.atan2(-self.dire[1], self.dire[0]))
+        #    self.image = pg.transform.rotozoom(self.imgs[(+1, 0)], angle, 1.0)
+        #elif 0 <=x_diff < 5 or 0 <= y_diff < 5:
+        #
+        #screen.blit(self.image, self.rect)
+        if norm <= self.speed:
+            self.rect.centerx = mouse_pos[0]
+            self.rect.centery = mouse_pos[1]
+        else:
+            self.rect.move_ip(self.speed * x_diff / norm, self.speed * y_diff / norm)
+        
         if check_bound(self.rect) != (True, True):
-            self.rect.move_ip(-current_speed*sum_mv[0], -current_speed*sum_mv[1])
-        if not (sum_mv[0] == 0 and sum_mv[1] == 0):
-            self.dire = tuple(sum_mv)
-            self.image = self.imgs[self.dire]
+            self.rect.move_ip(-self.speed * x_diff / norm, -self.speed * y_diff / norm)
+        
+        if x_diff != 0 or y_diff != 0:
+            self.dire = (x_diff / norm, y_diff / norm)
+            angle = math.degrees(math.atan2(-self.dire[1], self.dire[0]))
+            self.image = pg.transform.rotozoom(self.imgs[(+1, 0)], angle, 1.0)
+        
         screen.blit(self.image, self.rect)
+
 
 
 class Bomb(pg.sprite.Sprite):
@@ -309,6 +327,12 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
+        mouse_pos = pg.mouse.get_pos()
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                return 0
+            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
+                beams.add(Beam(bird, emy))
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
                 if score.value >= 200:
                     gravities.add(Gravity(400))
@@ -316,11 +340,12 @@ def main():
     
         screen.blit(scaled_bg_img, [0, 0])
 
-        if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
+
+        if tmr % 200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
 
         for emy in emys:
-            if emy.state == "stop" and tmr%emy.interval == 0:
+            if emy.state == "stop" and tmr % emy.interval == 0:
                 # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
                 bombs.add(Bomb(emy, bird))
 
@@ -334,7 +359,7 @@ def main():
             score.value += 1  # 1点アップ
 
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
-            bird.change_img(8, screen) # こうかとん悲しみエフェクト
+            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
             score.update(screen)
             pg.display.update()
             time.sleep(2)
@@ -351,13 +376,12 @@ def main():
             for bomb in pg.sprite.spritecollide(gravity, bombs, True):
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
-            
+
             for bomb in pg.sprite.spritecollide(gravity, emys, True):
                 exps.add(Explosion(bomb, 50))
                 score.value += 10
-        
-        
-        bird.update(key_lst, screen)
+
+        bird.update(mouse_pos, screen)
         beams.update()
         beams.draw(screen)
         emys.update()
