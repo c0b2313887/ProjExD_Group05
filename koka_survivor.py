@@ -180,6 +180,40 @@ class Beam(pg.sprite.Sprite):
         if check_bound(self.rect) != (True, True):
             self.kill()
 
+class Laser(pg.sprite.Sprite):
+    """
+    レーザーに関するクラス
+    """
+    def __init__(self, bird: Bird,angle=0):
+        super().__init__()
+        self.image = pg.Surface((WIDTH, HEIGHT), pg.SRCALPHA)
+        self.rect = self.image.get_rect()
+        self.bird = bird
+        self.color = (0, 255, 0)
+        self.width = 100
+        self.image = pg.transform.rotozoom(pg.image.load(f"fig/laser.png"), angle, 2.0)
+        self.vx, self.vy = bird.dire
+        angle = math.degrees(math.atan2(-self.vy, self.vx))
+        self.vx = math.cos(math.radians(angle))
+        self.vy = -math.sin(math.radians(angle))
+        self.rect.centery = bird.rect.centery + bird.rect.height * self.vy
+        self.rect.centerx = bird.rect.centerx + bird.rect.width * self.vx
+        self.speed = 10 
+    
+    def update(self, screen: pg.Surface):
+        """
+        レーザーを速度ベクトルself.vx, self.vyに基づき画面端まで移動させる
+        引数 screen：画面Surface
+        """
+        self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
+        if check_bound(self.rect) != (True, True):
+            self.kill()
+    def draw(self, screen: pg.Surface):
+        """
+        レーザーを画面に描画する
+        """
+        screen.blit(self.image, self.rect)
+
 class NeoBeam(pg.sprite.Sprite):
     """
     一度に複数方向へビームを発射するクラス
@@ -304,30 +338,65 @@ def main():
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
     gravities = pg.sprite.Group()
+    laser = None  # レーザーオブジェクトの初期化
 
     tmr = 0
     clock = pg.time.Clock()
+    laser_active = False
+    laser_timer = 0
+    laser_interval = 200  # レーザーの連射間隔（ミリ秒）
     while True:
         key_lst = pg.key.get_pressed()
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
+            
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
                 if score.value >= 200:
                     gravities.add(Gravity(400))
-                    score.value -= 200
+
+            for beam in beams:
+                beam.update()
+                if not check_bound(beam.rect):
+                    beam.kill()
+
+
+                    
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_SPACE and key_lst[pg.K_LSHIFT]: #シフト押下状態でスペースを押すと
                     neobeam = NeoBeam(bird, 5) #ビームを複数発射
                     beams.add(neobeam.gen_beams())
                 elif event.key == pg.K_SPACE:
                     screen.blit(scaled_bg_img, [0, 0])
+
+            if event.type == pg.KEYDOWN and event.key == pg.K_LCTRL:
+                laser_active = True
+                laser_timer = pg.time.get_ticks()  # 現在の時間を取得
+
+
+            elif event.type == pg.KEYUP and event.key == pg.K_LCTRL:
+                laser_active = False
+                laser = None  # レーザーオブジェクトをクリア
     
         screen.blit(bg_img, [0, 0])
 
+        
+        # レーザー発射中の処理
+        if laser_active:
+            current_time = pg.time.get_ticks()  # 現在の時間を取得
+            if current_time - laser_timer < 3000:  # 3000ミリ秒（3秒）間発射し続ける
+                if current_time - laser_timer > laser_interval:  # 連射間隔を超えたら発射
+                    laser = Laser(bird)  # レーザーオブジェクトの生成
+                    laser_timer = current_time  # 発射した時間を更新
+                laser.update(screen)
+                laser.draw(screen)  # レーザーを画面に描画
+            else:
+                laser_active = False
+                laser = None
+
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
-        if tmr%50 == 0: 
+        if tmr%50 == 0:  #50フレームに1回敵機を出現させる。
             beams.add(Beam(bird))
 
         for emy in emys:
@@ -378,8 +447,9 @@ def main():
         exps.update()
         exps.draw(screen)
         gravities.update()
-        gravities.draw(screen)
+        gravities.draw(screen)  
         score.update(screen)
+        beams.draw(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
