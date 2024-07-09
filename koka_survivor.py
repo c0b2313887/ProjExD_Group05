@@ -4,6 +4,7 @@ import random
 import sys
 import time
 import pygame as pg
+import pygame
 
 
 WIDTH = 1100  # ゲームウィンドウの幅
@@ -283,7 +284,8 @@ class Gravity(pg.sprite.Sprite):
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
-    bg_img = pg.image.load(f"fig/pg_bg.jpg")
+    bg_img = pg.image.load(f"fig/aozora.jpg")
+    scaled_bg_img = pygame.transform.scale(bg_img,(int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
     score = Score()
 
     bird = Bird(3, (900, 400))
@@ -313,7 +315,7 @@ def main():
                 elif event.key == pg.K_SPACE:
                     beams.add(Beam(bird))
     
-        screen.blit(bg_img, [0, 0])
+        screen.blit(scaled_bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
