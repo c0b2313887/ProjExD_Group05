@@ -341,6 +341,13 @@ def main():
             time.sleep(2)
             return
         
+        if len(pg.sprite.spritecollide(bird, emys, True)) != 0:
+            bird.change_img(8, screen) # こうかとん悲しみエフェクト
+            score.update(screen)
+            pg.display.update()
+            time.sleep(2)
+            return
+        
         for gravity in gravities:
             for bomb in pg.sprite.spritecollide(gravity, bombs, True):
                 exps.add(Explosion(bomb, 50))
