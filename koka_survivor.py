@@ -72,7 +72,7 @@ class Bird(pg.sprite.Sprite):
         self.image = self.imgs[self.dire]
         self.rect = self.image.get_rect()
         self.rect.center = xy
-        self.speed = 10
+        self.speed = 6
         
 
     def change_img(self, num: int, screen: pg.Surface):
@@ -143,24 +143,25 @@ class Bomb(pg.sprite.Sprite):
 
 
 class Beam(pg.sprite.Sprite):
-    """
-    ビームに関するクラス
-    """
-    def __init__(self, bird: Bird, angle0=0):
+    def __init__(self, bird: Bird, target: pg.Rect):
         """
         ビーム画像Surfaceを生成する
         引数 bird：ビームを放つこうかとん
+        引数 target：ビームの目標となる敵
         """
         super().__init__()
-        self.vx, self.vy = bird.dire
-        angle = math.degrees(math.atan2(-self.vy, self.vx)) + angle0
+        # こうかとん(bird)から敵(target)への方向ベクトルを計算
+        self.vx, self.vy = calc_orientation(bird.rect, target)
+        # ビームの角度を計算
+        angle = math.degrees(math.atan2(-self.vy, self.vx))
+        # ビーム画像を方向に合わせて回転
         self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), angle, 2.0)
-        self.vx = math.cos(math.radians(angle))
-        self.vy = -math.sin(math.radians(angle))
         self.rect = self.image.get_rect()
-        self.rect.centery = bird.rect.centery+bird.rect.height*self.vy
-        self.rect.centerx = bird.rect.centerx+bird.rect.width*self.vx
+        # ビームの初期位置を設定
+        self.rect.centery = bird.rect.centery + bird.rect.height * self.vy
+        self.rect.centerx = bird.rect.centerx + bird.rect.width * self.vx
         self.speed = 10    
+
 
     def update(self):
         """
@@ -285,7 +286,7 @@ def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/aozora.jpg")
-    scaled_bg_img = pygame.transform.scale(bg_img,(int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
+    scaled_bg_img = pg.transform.scale(bg_img,(int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
     score = Score()
 
     bird = Bird(3, (900, 400))
@@ -299,21 +300,19 @@ def main():
     clock = pg.time.Clock()
     while True:
         key_lst = pg.key.get_pressed()
+        if tmr%100 == 0:
+                if emys:  # 敵が存在する場合
+                    # 最も近い敵を選択
+                    nearest_enemy = min(emys, key=lambda emy: math.hypot(bird.rect.centerx - emy.rect.centerx, bird.rect.centery - emy.rect.centery))
+                    # 最も近い敵の方向にビームを発射
+                    beams.add(Beam(bird, nearest_enemy.rect))
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
-            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird))
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
                 if score.value >= 200:
                     gravities.add(Gravity(400))
                     score.value -= 200
-            if event.type == pg.KEYDOWN:
-                if event.key == pg.K_SPACE and key_lst[pg.K_LSHIFT]: #シフト押下状態でスペースを押すと
-                    neobeam = NeoBeam(bird, 5) #ビームを複数発射
-                    beams.add(neobeam.gen_beams())
-                elif event.key == pg.K_SPACE:
-                    beams.add(Beam(bird))
     
         screen.blit(scaled_bg_img, [0, 0])
 
