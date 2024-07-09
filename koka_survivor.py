@@ -72,7 +72,7 @@ class Bird(pg.sprite.Sprite):
         self.image = self.imgs[self.dire]
         self.rect = self.image.get_rect()
         self.rect.center = xy
-        self.speed = 10
+        self.speed = 6
         
 
     def change_img(self, num: int, screen: pg.Surface):
@@ -84,27 +84,45 @@ class Bird(pg.sprite.Sprite):
         self.image = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 1.0)
         screen.blit(self.image, self.rect)
 
-    def update(self, key_lst: list[bool], screen: pg.Surface):
+
+    
+    # マウスの方向にスピード5で進むようにする
+    def update(self, mouse_pos: tuple[int, int], screen: pg.Surface):
         """
-        押下キーに応じてこうかとんを移動させる
-        引数1 key_lst：押下キーの真理値リスト
+        マウスの方向に応じてこうかとんを移動させる
+        引数1 mouse_pos：マウスの現在位置座標タプル
         引数2 screen：画面Surface
         """
-        sum_mv = [0, 0]
-        current_speed = self.speed #current_speedにデフォルトのスピードを入れる
-        if key_lst[pg.K_LSHIFT]: #シフト押したらスピード20にする
-            current_speed = 20
-        for k, mv in __class__.delta.items():
-            if key_lst[k]:
-                sum_mv[0] += mv[0]
-                sum_mv[1] += mv[1]
-        self.rect.move_ip(current_speed*sum_mv[0], current_speed*sum_mv[1])
+        x_diff, y_diff = mouse_pos[0] - self.rect.centerx, mouse_pos[1] - self.rect.centery
+        norm = math.sqrt(x_diff**2 + y_diff**2)
+        #if norm != 0:
+        #    # マウスの方向ベクトルに速度5を乗じて移動させる
+        #    self.rect.move_ip(5 * x_diff / norm, 5 * y_diff / norm)
+        #if check_bound(self.rect) != (True, True):
+        #    self.rect.move_ip(-5 * x_diff / norm, -5 * y_diff / norm)
+        #if x_diff != 0 or y_diff != 0:
+        #    self.dire = (x_diff / norm, y_diff / norm)
+        #    angle = math.degrees(math.atan2(-self.dire[1], self.dire[0]))
+        #    self.image = pg.transform.rotozoom(self.imgs[(+1, 0)], angle, 1.0)
+        #elif 0 <=x_diff < 5 or 0 <= y_diff < 5:
+        #
+        #screen.blit(self.image, self.rect)
+        if norm <= self.speed:
+            self.rect.centerx = mouse_pos[0]
+            self.rect.centery = mouse_pos[1]
+        else:
+            self.rect.move_ip(self.speed * x_diff / norm, self.speed * y_diff / norm)
+        
         if check_bound(self.rect) != (True, True):
-            self.rect.move_ip(-current_speed*sum_mv[0], -current_speed*sum_mv[1])
-        if not (sum_mv[0] == 0 and sum_mv[1] == 0):
-            self.dire = tuple(sum_mv)
-            self.image = self.imgs[self.dire]
+            self.rect.move_ip(-self.speed * x_diff / norm, -self.speed * y_diff / norm)
+        
+        if x_diff != 0 or y_diff != 0:
+            self.dire = (x_diff / norm, y_diff / norm)
+            angle = math.degrees(math.atan2(-self.dire[1], self.dire[0]))
+            self.image = pg.transform.rotozoom(self.imgs[(+1, 0)], angle, 1.0)
+        
         screen.blit(self.image, self.rect)
+
 
 
 class Bomb(pg.sprite.Sprite):
@@ -143,24 +161,25 @@ class Bomb(pg.sprite.Sprite):
 
 
 class Beam(pg.sprite.Sprite):
-    """
-    ビームに関するクラス
-    """
-    def __init__(self, bird: Bird, angle0=0):
+    def __init__(self, bird: Bird, target: pg.Rect):
         """
         ビーム画像Surfaceを生成する
         引数 bird：ビームを放つこうかとん
+        引数 target：ビームの目標となる敵
         """
         super().__init__()
-        self.vx, self.vy = bird.dire
-        angle = math.degrees(math.atan2(-self.vy, self.vx)) + angle0
+        # こうかとん(bird)から敵(target)への方向ベクトルを計算
+        self.vx, self.vy = calc_orientation(bird.rect, target)
+        # ビームの角度を計算
+        angle = math.degrees(math.atan2(-self.vy, self.vx))
+        # ビーム画像を方向に合わせて回転
         self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), angle, 2.0)
-        self.vx = math.cos(math.radians(angle))
-        self.vy = -math.sin(math.radians(angle))
         self.rect = self.image.get_rect()
-        self.rect.centery = bird.rect.centery+bird.rect.height*self.vy
-        self.rect.centerx = bird.rect.centerx+bird.rect.width*self.vx
+        # ビームの初期位置を設定
+        self.rect.centery = bird.rect.centery + bird.rect.height * self.vy
+        self.rect.centerx = bird.rect.centerx + bird.rect.width * self.vx
         self.speed = 10    
+
 
     def update(self):
         """
@@ -285,7 +304,7 @@ def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/aozora.jpg")
-    scaled_bg_img = pygame.transform.scale(bg_img,(int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
+    scaled_bg_img = pg.transform.scale(bg_img,(int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
     score = Score()
 
     bird = Bird(3, (900, 400))
@@ -299,29 +318,34 @@ def main():
     clock = pg.time.Clock()
     while True:
         key_lst = pg.key.get_pressed()
+        if tmr%100 == 0:
+                if emys:  # 敵が存在する場合
+                    # 最も近い敵を選択
+                    nearest_enemy = min(emys, key=lambda emy: math.hypot(bird.rect.centerx - emy.rect.centerx, bird.rect.centery - emy.rect.centery))
+                    # 最も近い敵の方向にビームを発射
+                    beams.add(Beam(bird, nearest_enemy.rect))
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                return 0
+        mouse_pos = pg.mouse.get_pos()
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird))
+                beams.add(Beam(bird, emy))
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
                 if score.value >= 200:
                     gravities.add(Gravity(400))
                     score.value -= 200
-            if event.type == pg.KEYDOWN:
-                if event.key == pg.K_SPACE and key_lst[pg.K_LSHIFT]: #シフト押下状態でスペースを押すと
-                    neobeam = NeoBeam(bird, 5) #ビームを複数発射
-                    beams.add(neobeam.gen_beams())
-                elif event.key == pg.K_SPACE:
-                    beams.add(Beam(bird))
     
         screen.blit(scaled_bg_img, [0, 0])
 
-        if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
+
+        if tmr % 200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
 
         for emy in emys:
-            if emy.state == "stop" and tmr%emy.interval == 0:
+            if emy.state == "stop" and tmr % emy.interval == 0:
                 # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
                 bombs.add(Bomb(emy, bird))
 
@@ -335,6 +359,13 @@ def main():
             score.value += 1  # 1点アップ
 
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
+            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
+            score.update(screen)
+            pg.display.update()
+            time.sleep(2)
+            return
+        
+        if len(pg.sprite.spritecollide(bird, emys, True)) != 0:
             bird.change_img(8, screen) # こうかとん悲しみエフェクト
             score.update(screen)
             pg.display.update()
@@ -345,13 +376,12 @@ def main():
             for bomb in pg.sprite.spritecollide(gravity, bombs, True):
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
-            
+
             for bomb in pg.sprite.spritecollide(gravity, emys, True):
                 exps.add(Explosion(bomb, 50))
                 score.value += 10
-        
-        
-        bird.update(key_lst, screen)
+
+        bird.update(mouse_pos, screen)
         beams.update()
         beams.draw(screen)
         emys.update()
