@@ -105,6 +105,12 @@ class Bird(pg.sprite.Sprite):
             self.dire = tuple(sum_mv)
             self.image = self.imgs[self.dire]
         screen.blit(self.image, self.rect)
+    
+    def shoot_laser(self):
+        """
+        レーザーを発射するメソッド
+        """
+        return Laser(self)
 
 
 class Bomb(pg.sprite.Sprite):
@@ -182,37 +188,60 @@ class Beam(pg.sprite.Sprite):
 
 class Laser(pg.sprite.Sprite):
     """
-    レーザーに関するクラス
+    一直線に出るレーザークラス
     """
-    def __init__(self, bird: Bird,angle=0):
+    def __init__(self, bird: Bird, duration: int = 3000):  # デフォルトの持続時間を3000ミリ秒に設定
         super().__init__()
-        self.image = pg.Surface((WIDTH, HEIGHT), pg.SRCALPHA)
-        self.rect = self.image.get_rect()
-        self.bird = bird
-        self.color = (0, 255, 0)
-        self.width = 100
-        self.image = pg.transform.rotozoom(pg.image.load(f"fig/laser.png"), angle, 2.0)
         self.vx, self.vy = bird.dire
         angle = math.degrees(math.atan2(-self.vy, self.vx))
-        self.vx = math.cos(math.radians(angle))
-        self.vy = -math.sin(math.radians(angle))
-        self.rect.centery = bird.rect.centery + bird.rect.height * self.vy
-        self.rect.centerx = bird.rect.centerx + bird.rect.width * self.vx
-        self.speed = 10 
+        self.image = pg.transform.rotozoom(pg.image.load(f"fig/biglaser.png"), angle, 1.0)
+
+        # レーザーを画面全体に伸ばす
+        self.image = pg.transform.scale(self.image, (WIDTH,HEIGHT))
+
+        # 発射位置をこうかとんの頭の位置に設定
+        self.rect = self.image.get_rect()
+        self.rect.centerx = bird.rect.centerx  # こうかとんの中心位置
+        self.rect.top = bird.rect.top  # こうかとんの頭の位置
+
+        # 発射位置をこうかとんの頭の位置に設定
+        self.rect = self.image.get_rect()
+        if self.vx == 0 and self.vy == -1:  # 上向き
+            self.rect.centerx = bird.rect.centerx
+            self.rect.bottom = bird.rect.top
+        elif self.vx == 0 and self.vy == 1:  # 下向き
+            self.rect.centerx = bird.rect.centerx
+            self.rect.top = bird.rect.bottom
+        elif self.vx == 1 and self.vy == 0:  # 右向き
+            self.rect.left = bird.rect.right
+            self.rect.centery = bird.rect.centery
+        elif self.vx == -1 and self.vy == 0:  # 左向き
+            self.rect.right = bird.rect.left
+            self.rect.centery = bird.rect.centery
+        elif self.vx == 1 and self.vy == -1:  # 右上向き
+            self.rect.left = bird.rect.right
+            self.rect.bottom = bird.rect.top
+        elif self.vx == 1 and self.vy == 1:  # 右下向き
+            self.rect.left = bird.rect.right
+            self.rect.top = bird.rect.bottom
+        elif self.vx == -1 and self.vy == -1:  # 左上向き
+            self.rect.right = bird.rect.left
+            self.rect.bottom = bird.rect.top
+        elif self.vx == -1 and self.vy == 1:  # 左下向き
+            self.rect.right = bird.rect.left
+            self.rect.top = bird.rect.bottom
+        
+        self.speed = 0  # 動かないため速度は0
+        self.duration = duration  # ミリ秒
+        self.spawn_time = pg.time.get_ticks()  # 発生時刻
     
-    def update(self, screen: pg.Surface):
+    def update(self):
         """
-        レーザーを速度ベクトルself.vx, self.vyに基づき画面端まで移動させる
-        引数 screen：画面Surface
+        レーザーを速度ベクトルself.vx, self.vyに基づき移動させる
         """
-        self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
-        if check_bound(self.rect) != (True, True):
-            self.kill()
-    def draw(self, screen: pg.Surface):
-        """
-        レーザーを画面に描画する
-        """
-        screen.blit(self.image, self.rect)
+        current_time = pg.time.get_ticks()
+        if current_time - self.spawn_time > self.duration:  # 指定時間が経過したら
+            self.kill()  # レーザーを消す
 
 class NeoBeam(pg.sprite.Sprite):
     """
@@ -338,13 +367,10 @@ def main():
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
     gravities = pg.sprite.Group()
-    laser = None  # レーザーオブジェクトの初期化
+    lasers = pg.sprite.Group()  # レーザーのグループを追加
 
     tmr = 0
     clock = pg.time.Clock()
-    laser_active = False
-    laser_timer = 0
-    laser_interval = 200  # レーザーの連射間隔（ミリ秒）
     while True:
         key_lst = pg.key.get_pressed()
         for event in pg.event.get():
@@ -368,36 +394,17 @@ def main():
                     beams.add(neobeam.gen_beams())
                 elif event.key == pg.K_SPACE:
                     screen.blit(scaled_bg_img, [0, 0])
-
-            if event.type == pg.KEYDOWN and event.key == pg.K_LCTRL:
-                laser_active = True
-                laser_timer = pg.time.get_ticks()  # 現在の時間を取得
-
-
-            elif event.type == pg.KEYUP and event.key == pg.K_LCTRL:
-                laser_active = False
-                laser = None  # レーザーオブジェクトをクリア
+                elif event.key == pg.K_TAB:  # Tabキーを押すとレーザーを発射
+                    lasers.add(bird.shoot_laser())
     
         screen.blit(bg_img, [0, 0])
 
-        
-        # レーザー発射中の処理
-        if laser_active:
-            current_time = pg.time.get_ticks()  # 現在の時間を取得
-            if current_time - laser_timer < 3000:  # 3000ミリ秒（3秒）間発射し続ける
-                if current_time - laser_timer > laser_interval:  # 連射間隔を超えたら発射
-                    laser = Laser(bird)  # レーザーオブジェクトの生成
-                    laser_timer = current_time  # 発射した時間を更新
-                laser.update(screen)
-                laser.draw(screen)  # レーザーを画面に描画
-            else:
-                laser_active = False
-                laser = None
-
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
-        if tmr%50 == 0:  #50フレームに1回敵機を出現させる。
+        if tmr%50 == 0:  #50フレームに1回攻撃を出現させる。
             beams.add(Beam(bird))
+        if tmr%500 == 0:  #1000フレームに1回攻撃を出現させる。
+            beams.add(Laser(bird))
 
         for emy in emys:
             if emy.state == "stop" and tmr%emy.interval == 0:
@@ -435,6 +442,14 @@ def main():
             for bomb in pg.sprite.spritecollide(gravity, emys, True):
                 exps.add(Explosion(bomb, 50))
                 score.value += 10
+
+        for laser in pg.sprite.groupcollide(lasers, emys, True, True).keys():
+            exps.add(Explosion(laser, 100))  # 爆発エフェクト
+            score.value += 10  # 10点アップ
+
+        for laser in pg.sprite.groupcollide(lasers, bombs, True, True).keys():
+            exps.add(Explosion(laser, 50))  # 爆発エフェクト
+            score.value += 1  # 1点アップ
         
         
         bird.update(key_lst, screen)
@@ -450,6 +465,8 @@ def main():
         gravities.draw(screen)  
         score.update(screen)
         beams.draw(screen)
+        lasers.update()  # レーザーの更新を追加     
+        lasers.draw(screen)  # レーザーの描画を追加
         pg.display.update()
         tmr += 1
         clock.tick(50)
