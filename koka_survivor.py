@@ -95,8 +95,28 @@ class Bird(pg.sprite.Sprite):
         引数1 mouse_pos：マウスの現在位置座標タプル
         引数2 screen：画面Surface
         """
+        #ここから変更
         x_diff, y_diff = mouse_pos[0] - self.rect.centerx, mouse_pos[1] - self.rect.centery
         norm = math.sqrt(x_diff**2 + y_diff**2)
+        if norm <= self.speed:
+            self.rect.centerx = mouse_pos[0]
+            self.rect.centery = mouse_pos[1]
+        else:
+            self.rect.move_ip(self.speed * x_diff / norm, self.speed * y_diff / norm)
+
+        #ここまで
+        if check_bound(self.rect) != (True, True):
+        #ここから変更
+            self.rect.move_ip(-self.speed * x_diff / norm, -self.speed * y_diff / norm)
+        
+        if x_diff != 0 or y_diff != 0:
+            self.dire = (x_diff / norm, y_diff / norm)
+            angle = math.degrees(math.atan2(-self.dire[1], self.dire[0]))
+            self.image = pg.transform.rotozoom(self.imgs[(+1, 0)], angle, 1.0)
+
+        #ここまで
+        screen.blit(self.image, self.rect)
+
         #if norm != 0:
         #    # マウスの方向ベクトルに速度5を乗じて移動させる
         #    self.rect.move_ip(5 * x_diff / norm, 5 * y_diff / norm)
@@ -109,21 +129,6 @@ class Bird(pg.sprite.Sprite):
         #elif 0 <=x_diff < 5 or 0 <= y_diff < 5:
         #
         #screen.blit(self.image, self.rect)
-        if norm <= self.speed:
-            self.rect.centerx = mouse_pos[0]
-            self.rect.centery = mouse_pos[1]
-        else:
-            self.rect.move_ip(self.speed * x_diff / norm, self.speed * y_diff / norm)
-        
-        if check_bound(self.rect) != (True, True):
-            self.rect.move_ip(-self.speed * x_diff / norm, -self.speed * y_diff / norm)
-        
-        if x_diff != 0 or y_diff != 0:
-            self.dire = (x_diff / norm, y_diff / norm)
-            angle = math.degrees(math.atan2(-self.dire[1], self.dire[0]))
-            self.image = pg.transform.rotozoom(self.imgs[(+1, 0)], angle, 1.0)
-        
-        screen.blit(self.image, self.rect)
 
 
 
