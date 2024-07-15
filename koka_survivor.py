@@ -231,7 +231,7 @@ class Laser(pg.sprite.Sprite):
             self.rect.right = bird.rect.left
             self.rect.top = bird.rect.bottom
         
-        self.speed = 0  # 動かないため速度は0
+        self.speed = 0  # 動かないから速度は0
         self.duration = duration  # ミリ秒
         self.spawn_time = pg.time.get_ticks()  # 発生時刻
     
@@ -403,7 +403,7 @@ def main():
             emys.add(Enemy())
         if tmr%50 == 0:  #50フレームに1回攻撃を出現させる。
             beams.add(Beam(bird))
-        if tmr%500 == 0:  #1000フレームに1回攻撃を出現させる。
+        if tmr%500 == 0:  #500フレームに1回攻撃を出現させる。
             beams.add(Laser(bird))
 
         for emy in emys:
