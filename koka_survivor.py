@@ -467,6 +467,7 @@ def main():
         beams.draw(screen)
         lasers.update()  # レーザーの更新を追加     
         lasers.draw(screen)  # レーザーの描画を追加
+        score.update(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
