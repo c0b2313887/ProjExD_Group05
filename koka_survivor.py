@@ -4,7 +4,7 @@ import random
 import sys
 import time
 import pygame as pg
-import pygame
+
 
 
 WIDTH = 1100  # ゲームウィンドウの幅
@@ -369,6 +369,48 @@ class Gravity(pg.sprite.Sprite):
         if self.life < 0:
             self.kill()
 
+class RollBlade(pg.sprite.Sprite):
+    def __init__(self, bird: Bird, num):
+        super().__init__()
+        self.bird = bird
+        self.blade_count = num
+        self.speed = 3
+        self.radius = 100
+        self.angle = 0
+        self.size = 75
+        
+
+        self.original_image = pg.image.load("fig/blade.png").convert_alpha()
+        self.image = pg.transform.scale(self.original_image, (self.size, self.size))
+        self.rect = self.original_image.get_rect()
+
+    def update(self):
+        self.angle = (self.angle + self.speed) % 360
+        self.update_positions()
+
+    def update_positions(self):
+        for i in range(self.blade_count):
+            angle_offset = 360 / self.blade_count * i
+            rad_angle = math.radians(self.angle + angle_offset)
+            blade_rect = self.image.get_rect()
+            blade_rect.center = (
+                self.bird.rect.centerx + self.radius * math.cos(rad_angle),
+                self.bird.rect.centery + self.radius * math.sin(rad_angle)
+            )
+            self.image = pg.transform.rotate(self.original_image, -(self.angle + angle_offset))
+            self.rect = blade_rect
+
+    def draw(self, screen):
+        for i in range(self.blade_count):
+            angle_offset = 360 / self.blade_count * i
+            rad_angle = math.radians(self.angle + angle_offset)
+            blade_rect = self.image.get_rect()
+            blade_rect.center = (
+                self.bird.rect.centerx + self.radius * math.cos(rad_angle),
+                self.bird.rect.centery + self.radius * math.sin(rad_angle)
+            )
+            rotated_image = pg.transform.rotate(self.original_image, -(self.angle + angle_offset))
+            screen.blit(rotated_image, blade_rect)
 
 def main():
     pg.display.set_caption("真！こうかとん無双")
@@ -376,16 +418,21 @@ def main():
     bg_img = pg.image.load(f"fig/aozora.jpg")
     scaled_bg_img = pg.transform.scale(bg_img, (int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
     score = Score()
+    num = 1 #Bladeの数
 
     bird = Bird(3, (900, 400))
     bombs = pg.sprite.Group()
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
-    gravities = pg.sprite.Group() 
+    gravities = pg.sprite.Group()
+    blades = pg.sprite.Group()
+    blades.add(RollBlade(bird, num))
 
     tmr = 0
     clock = pg.time.Clock()
+
+
     while True:
         key_lst = pg.key.get_pressed()
         if tmr % 100 == 0:
@@ -409,7 +456,7 @@ def main():
                 if score.value >= 200:
                     gravities.add(Gravity(400))
                     score.value -= 200
-    
+
         screen.blit(scaled_bg_img, [0, 0])
         if tmr % 100 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy(bird))  # 鳥のインスタンスを渡す
@@ -427,11 +474,28 @@ def main():
 
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
             bird.change_img(8, screen)  # こうかとん悲しみエフェクト
+
+        
+
+        for emy in pg.sprite.groupcollide(emys, blades, True, False).keys():
+            exps.add(Explosion(emy, 100))
+            score.value += 10
+            bird.change_img(6, screen)
+            bird.gain_experience(10) 
+
+        for bomb in pg.sprite.groupcollide(bombs, blades, True, False).keys():
+            exps.add(Explosion(bomb, 50))
+            score.value += 1
+            bird.gain_experience(5) 
+
+
+        if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
+            bird.change_img(8, screen)
             score.update(screen)
             pg.display.update()
             time.sleep(2)
             return
-        
+
         if len(pg.sprite.spritecollide(bird, emys, True)) != 0:
             bird.change_img(8, screen)  # こうかとん悲しみエフェクト
             score.update(screen)
@@ -468,6 +532,10 @@ def main():
         exps.draw(screen)
         gravities.update()
         gravities.draw(screen)
+        blades.update()
+        blades.draw(screen)
+        for blade in blades:
+            blade.draw(screen)
         score.update(screen)
         pg.display.update()
         tmr += 1
@@ -480,3 +548,4 @@ if __name__ == "__main__":
     main()
     pg.quit()
     sys.exit()
+
