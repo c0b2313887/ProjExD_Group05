@@ -330,7 +330,7 @@ def main():
     bg_img = pg.image.load(f"fig/aozora.jpg")
     scaled_bg_img = pg.transform.scale(bg_img, (int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
     score = Score()
-    num = 2 #Bladeの数
+    num = 1 #Bladeの数
 
     bird = Bird(3, (900, 400))
     bombs = pg.sprite.Group()
