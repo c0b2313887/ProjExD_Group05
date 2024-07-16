@@ -89,8 +89,6 @@ class Bird(pg.sprite.Sprite):
         self.image = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 1.0)
         screen.blit(self.image, self.rect)
 
-
-    
     # マウスの方向にスピード5で進むようにする
     def update(self, mouse_pos: tuple[int, int], screen: pg.Surface):
         """
@@ -100,8 +98,7 @@ class Bird(pg.sprite.Sprite):
         """
         x_diff, y_diff = mouse_pos[0] - self.rect.centerx, mouse_pos[1] - self.rect.centery
         norm = math.sqrt(x_diff**2 + y_diff**2)
-         
-        
+
     def gain_experience(self, amount: int):
         """
         経験値を取得し、レベルアップをチェックする
@@ -170,7 +167,6 @@ class Bird(pg.sprite.Sprite):
         screen.blit(self.image, self.rect)
         self.display_level(screen)
         self.display_experience_bar(screen)
-
 
 
 
@@ -355,7 +351,7 @@ def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/aozora.jpg")
-    scaled_bg_img = pg.transform.scale(bg_img,(int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
+    scaled_bg_img = pg.transform.scale(bg_img, (int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
     score = Score()
 
     bird = Bird(3, (900, 400))
