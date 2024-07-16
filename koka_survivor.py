@@ -4,6 +4,7 @@ import random
 import sys
 import time
 import pygame as pg
+import pygame
 
 
 
@@ -170,6 +171,12 @@ class Bird(pg.sprite.Sprite):
 
 
 
+    
+    def shoot_laser(self):
+        """
+        レーザーを発射するメソッド
+        """
+        return Laser(self)
 
 
 class Bomb(pg.sprite.Sprite):
@@ -230,12 +237,53 @@ class Beam(pg.sprite.Sprite):
 
     def update(self):
         """
+        爆弾を速度ベクトルself.vx, self.vyに基づき移動させる
+        引数 screen：画面Surface
+        """
+        self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
+        if check_bound(self.rect) != (True, True):
+            self.kill()
+
+    def update(self):
+        """
         ビームを速度ベクトルself.vx, self.vyに基づき移動させる
         引数 screen：画面Surface
         """
         self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
         if check_bound(self.rect) != (True, True):
             self.kill()
+
+class Laser(pg.sprite.Sprite):
+    """
+    一直線に出るレーザークラス
+    """
+    def __init__(self, bird: Bird, duration: int = 3000):  # デフォルトの持続時間を3000ミリ秒に設定
+        super().__init__()
+        self.vx, self.vy = bird.dire
+        angle = math.degrees(math.atan2(-self.vy, self.vx))
+        self.image = pg.transform.rotozoom(pg.image.load(f"fig/biglaser.png"), angle, 1.0)
+        self.rect = self.image.get_rect()
+
+        # レーザーを画面全体に伸ばす
+        self.image = pg.transform.scale(self.image, (WIDTH,HEIGHT))
+
+        # 発射位置をこうかとんの頭の位置に設定
+        self.rect_WIDTH = self.image.get_width()
+        self.rect.centerx = self.rect.centerx + self.rect_WIDTH/2
+        self.rect.centery = self.rect.centery
+
+        
+        self.speed = 0  # 動かないから速度は0
+        self.duration = duration  # ミリ秒
+        self.spawn_time = pg.time.get_ticks()  # 発生時刻
+    
+    def update(self):
+        """
+        レーザーを速度ベクトルself.vx, self.vyに基づき移動させる
+        """
+        current_time = pg.time.get_ticks()
+        if current_time - self.spawn_time > self.duration:  # 指定時間が経過したら
+            self.kill()  # レーザーを消す
 
 class NeoBeam(pg.sprite.Sprite):
     """
@@ -261,6 +309,7 @@ class Explosion(pg.sprite.Sprite):
     """
     爆発に関するクラス
     """
+    
     def __init__(self, obj: "Bomb|Enemy", life: int):
         """
         爆弾が爆発するエフェクトを生成する
@@ -428,6 +477,7 @@ def main():
     gravities = pg.sprite.Group()
     blades = pg.sprite.Group()
     blades.add(RollBlade(bird, num))
+    lasers = pg.sprite.Group()  # レーザーのグループを追加
 
     tmr = 0
     clock = pg.time.Clock()
@@ -460,6 +510,8 @@ def main():
         screen.blit(scaled_bg_img, [0, 0])
         if tmr % 100 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy(bird))  # 鳥のインスタンスを渡す
+        if tmr%500 == 0:  #500フレームに1回攻撃を出現させる。
+            beams.add(Laser(bird))
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
@@ -510,6 +562,13 @@ def main():
             time.sleep(2)
             return
         
+        if len(pg.sprite.spritecollide(bird, emys, True)) != 0:
+            bird.change_img(8, screen) # こうかとん悲しみエフェクト
+            score.update(screen)
+            pg.display.update()
+            time.sleep(2)
+            return
+        
         for gravity in gravities:
             for bomb in pg.sprite.spritecollide(gravity, bombs, True):
                 exps.add(Explosion(bomb, 50))
@@ -520,12 +579,22 @@ def main():
                 exps.add(Explosion(bomb, 50))
                 score.value += 10
                 bird.gain_experience(10)  # 経験値を獲得
+
+        for laser in pg.sprite.groupcollide(lasers, emys, False, True).keys():
+            exps.add(Explosion(laser, 100))  # 爆発エフェクト
+            score.value += 10  # 10点アップ
+
+        for laser in pg.sprite.groupcollide(lasers, bombs, False, True).keys():
+            exps.add(Explosion(laser, 50))  # 爆発エフェクト
+            score.value += 1  # 1点アップ
         
         bird.update(mouse_pos, screen)
         beams.update()
         beams.draw(screen)
         emys.update()
         emys.draw(screen)
+        lasers.update()  # レーザーの更新を追加     
+        lasers.draw(screen)  # レーザーの描画を追加
         bombs.update()
         bombs.draw(screen)
         exps.update()
@@ -536,6 +605,9 @@ def main():
         blades.draw(screen)
         for blade in blades:
             blade.draw(screen)
+        gravities.draw(screen)  
+        score.update(screen)
+        beams.draw(screen)
         score.update(screen)
         pg.display.update()
         tmr += 1
