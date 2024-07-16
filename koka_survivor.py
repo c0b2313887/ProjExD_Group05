@@ -443,11 +443,11 @@ def main():
                 exps.add(Explosion(bomb, 50))
                 score.value += 10
 
-        for laser in pg.sprite.groupcollide(lasers, emys, True, True).keys():
+        for laser in pg.sprite.groupcollide(lasers, emys, False, True).keys():
             exps.add(Explosion(laser, 100))  # 爆発エフェクト
             score.value += 10  # 10点アップ
 
-        for laser in pg.sprite.groupcollide(lasers, bombs, True, True).keys():
+        for laser in pg.sprite.groupcollide(lasers, bombs, False, True).keys():
             exps.add(Explosion(laser, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
         
@@ -457,6 +457,8 @@ def main():
         beams.draw(screen)
         emys.update()
         emys.draw(screen)
+        lasers.update()  # レーザーの更新を追加     
+        lasers.draw(screen)  # レーザーの描画を追加
         bombs.update()
         bombs.draw(screen)
         exps.update()
@@ -465,8 +467,6 @@ def main():
         gravities.draw(screen)  
         score.update(screen)
         beams.draw(screen)
-        lasers.update()  # レーザーの更新を追加     
-        lasers.draw(screen)  # レーザーの描画を追加
         score.update(screen)
         pg.display.update()
         tmr += 1
