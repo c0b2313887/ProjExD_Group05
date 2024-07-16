@@ -242,28 +242,51 @@ class Enemy(pg.sprite.Sprite):
     """
     敵機に関するクラス
     """
-    imgs = [pg.image.load(f"fig/alien{i}.png") for i in range(1, 4)]
+    imgs = [pg.image.load(f"fig/enemy{i}.png") for i in range(1, 4)]
     
-    def __init__(self):
+    def __init__(self, bird: Bird):
         super().__init__()
-        self.image = random.choice(__class__.imgs)
+        self.original_image = random.choice(__class__.imgs)
+        self.image = self.original_image
         self.rect = self.image.get_rect()
-        self.rect.center = random.randint(0, WIDTH), 0
-        self.vx, self.vy = 0, +6
-        self.bound = random.randint(50, HEIGHT//2)  # 停止位置
-        self.state = "down"  # 降下状態or停止状態
-        self.interval = random.randint(50, 300)  # 爆弾投下インターバル
+        self.bird = bird
+
+        direction = random.choice(['top', 'left', 'right', 'bottom'])
+        if direction == 'top':
+            self.rect.center = random.randint(0, WIDTH), 0
+        elif direction == 'left':
+            self.rect.center = 0, random.randint(0, HEIGHT)
+        elif direction == 'right':
+            self.rect.center = WIDTH, random.randint(0, HEIGHT)
+        elif direction == 'bottom':
+            self.rect.center = random.randint(0, WIDTH), HEIGHT
+        
+        self.speed = 4
 
     def update(self):
         """
-        敵機を速度ベクトルself.vyに基づき移動（降下）させる
-        ランダムに決めた停止位置_boundまで降下したら，_stateを停止状態に変更する
-        引数 screen：画面Surface
+        敵機をこうかとんの位置に向かって移動させる
         """
-        if self.rect.centery > self.bound:
-            self.vy = 0
-            self.state = "stop"
-        self.rect.move_ip(self.vx, self.vy)
+        bird_x, bird_y = self.bird.rect.center  # こうかとんの位置を取得
+        x_diff, y_diff = bird_x - self.rect.centerx, bird_y - self.rect.centery
+        angle = math.degrees(math.atan2(-y_diff, x_diff))  # 角度を計算
+
+        if abs(x_diff) > abs(y_diff):  # 横方向の移動が大きい場合
+            if x_diff > 0:  # こうかとんが右にいる場合
+                self.image = pg.transform.flip(self.original_image, True, False)
+            else:  # こうかとんが左にいる場合
+                self.image = self.original_image
+            self.image = pg.transform.rotate(self.image, 0)
+        else:  # 縦方向の移動が大きい場合
+            if y_diff < 0:  # こうかとんが下にいる場合
+                self.image = pg.transform.rotate(self.original_image, -90)
+            else:  # こうかとんが上にいる場合
+                self.image = pg.transform.rotate(self.original_image, 90)
+
+        norm = math.sqrt(x_diff**2 + y_diff**2)
+        if norm != 0:
+            self.vx, self.vy = (self.speed * x_diff / norm, self.speed * y_diff / norm)
+            self.rect.move_ip(self.vx, self.vy)
 
 
 class Score:
@@ -304,7 +327,7 @@ def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/aozora.jpg")
-    scaled_bg_img = pg.transform.scale(bg_img,(int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
+    scaled_bg_img = pg.transform.scale(bg_img, (int(bg_img.get_width() * 0.7), int(bg_img.get_height() * 0.7)))
     score = Score()
 
     bird = Bird(3, (900, 400))
@@ -340,14 +363,8 @@ def main():
     
         screen.blit(scaled_bg_img, [0, 0])
 
-
-        if tmr % 200 == 0:  # 200フレームに1回，敵機を出現させる
-            emys.add(Enemy())
-
-        for emy in emys:
-            if emy.state == "stop" and tmr % emy.interval == 0:
-                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
-                bombs.add(Bomb(emy, bird))
+        if tmr % 100 == 0:  # 200フレームに1回，敵機を出現させる
+            emys.add(Enemy(bird))  # 鳥のインスタンスを渡す
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
@@ -366,7 +383,14 @@ def main():
             return
         
         if len(pg.sprite.spritecollide(bird, emys, True)) != 0:
-            bird.change_img(8, screen) # こうかとん悲しみエフェクト
+            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
+            score.update(screen)
+            pg.display.update()
+            time.sleep(2)
+            return
+        
+        if len(pg.sprite.spritecollide(bird, emys, True)) != 0:
+            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
             score.update(screen)
             pg.display.update()
             time.sleep(2)
@@ -380,7 +404,7 @@ def main():
             for bomb in pg.sprite.spritecollide(gravity, emys, True):
                 exps.add(Explosion(bomb, 50))
                 score.value += 10
-
+        
         bird.update(mouse_pos, screen)
         beams.update()
         beams.draw(screen)
@@ -396,6 +420,7 @@ def main():
         pg.display.update()
         tmr += 1
         clock.tick(50)
+
 
 
 if __name__ == "__main__":
